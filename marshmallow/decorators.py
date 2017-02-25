@@ -61,12 +61,12 @@ VALIDATES = 'validates'
 VALIDATES_SCHEMA = 'validates_schema'
 
 
-def validates(field_name):
+def validates(field_name, at_once=False):
     """Register a field validator.
 
     :param str field_name: Name of the field that the method validates.
     """
-    return tag_processor(VALIDATES, None, False, field_name=field_name)
+    return tag_processor(VALIDATES, None, False, field_name=field_name, at_once=at_once)
 
 
 def validates_schema(fn=None, pass_many=False, pass_original=False, skip_on_field_errors=False):

@@ -857,45 +857,80 @@ class BaseSchema(base.SchemaABC):
         for attr_name in self.__processors__[(VALIDATES, False)]:
             validator = getattr(self, attr_name)
             validator_kwargs = validator.__marshmallow_kwargs__[(VALIDATES, False)]
-            field_name = validator_kwargs['field_name']
+            field_names = validator_kwargs['field_name']
+            at_once = validator_kwargs['at_once']
 
-            try:
-                field_obj = self.fields[field_name]
-            except KeyError:
-                if field_name in self.declared_fields:
-                    continue
-                raise ValueError('"{0}" field does not exist.'.format(field_name))
+            if type(field_names) is not list:
+                field_names = [field_names]
+
+            field_objects = {}
+            required_missing = False
+
+            if at_once and set(field_names) - set(data.keys()):
+                continue
+
+            for field_name in field_names:
+                try:
+                    field_objects[field_name] = self.fields[field_name]
+                except KeyError:
+                    if field_name not in self.declared_fields:
+                        raise ValueError('"{0}" field does not exist.'.format(field_name))
 
             if many:
                 for idx, item in enumerate(data):
                     try:
-                        value = item[field_obj.attribute or field_name]
+                        values = {k: data[v.attribute or k] for k, v in field_objects.items()}
                     except KeyError:
                         pass
                     else:
-                        validated_value = self._unmarshal.call_and_store(
-                            getter_func=validator,
-                            data=value,
-                            field_name=field_name,
-                            field_obj=field_obj,
-                            index=(idx if self.opts.index_errors else None)
-                        )
-                        if validated_value is missing:
-                            data[idx].pop(field_name, None)
+                        if at_once:
+                            validated_value = self._unmarshal.call_and_store(
+                                getter_func=validator,
+                                data=values,
+                                field_name=field_name,
+                                field_obj=field_objects,
+                                index=(idx if self.opts.index_errors else None)
+                            )
+
+                            if validated_value is missing:
+                                data[idx].pop(field_name, None) 
+                        else:
+                            for k,v in field_objects.items():
+                                validated_value = self._unmarshal.call_and_store(
+                                    getter_func=validator,
+                                    data=values[k],
+                                    field_name=field_name,
+                                    field_obj=v,
+                                    index=(idx if self.opts.index_errors else None)
+                                )
+
+                            if validated_value is missing:
+                                data[idx].pop(field_name, None) 
             else:
                 try:
-                    value = data[field_obj.attribute or field_name]
+                    values = {k: data[v.attribute or k] for k, v in field_objects.items()}
                 except KeyError:
                     pass
                 else:
-                    validated_value = self._unmarshal.call_and_store(
-                        getter_func=validator,
-                        data=value,
-                        field_name=field_name,
-                        field_obj=field_obj
-                    )
-                    if validated_value is missing:
-                        data.pop(field_name, None)
+                    if at_once:
+                        validated_value = self._unmarshal.call_and_store(
+                            getter_func=validator,
+                            data=values,
+                            field_name=field_name,
+                            field_obj=field_objects
+                        )
+                        if validated_value is missing:
+                            data.pop(field_name, None)
+                    else:
+                        for k,v in field_objects.items():
+                            validated_value = self._unmarshal.call_and_store(
+                                getter_func=validator,
+                                data=values[k],
+                                field_name=field_name,
+                                field_obj=v
+                            )
+                            if validated_value is missing:
+                                data.pop(field_name, None)
 
     def _invoke_validators(self, pass_many, data, original_data, many, field_errors=False):
         errors = {}
