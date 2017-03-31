@@ -234,6 +234,22 @@ class ValidatesSchema(Schema):
         if value != 42:
             raise ValidationError('The answer to life the universe and everything.')
 
+class MultipleValidatesSchema(Schema):
+    age = fields.Int()
+    first_name = fields.String()
+    last_name = fields.String()
+    party_type = fields.String()
+
+    @validates(['first_name', 'last_name'])
+    def validate_name(self, value):
+        if len(value) < 3:
+            raise ValidationError('names should be at least 6 characters long.')
+
+    @validates(['age', 'party_type'], at_once=True)
+    def validate_name(self, value):
+        if value['age'] < 18 and value['party_type'] == 'alcool':
+            raise ValidationError('you should be at least 21 for this party.')
+
 class TestValidatesDecorator:
 
     def test_validates_and_strict(self):
@@ -266,7 +282,7 @@ class TestValidatesDecorator:
 
     def test_validates_decorator(self):
         schema = ValidatesSchema()
-
+        
         errors = schema.validate({'foo': 41})
         assert 'foo' in errors
         assert errors['foo'][0] == 'The answer to life the universe and everything.'
@@ -296,6 +312,18 @@ class TestValidatesDecorator:
         assert 1 in errors
         assert 'foo' in errors[1]
         assert errors[1]['foo'] == ['The answer to life the universe and everything.']
+
+    def test_validates_multiple_fields(self):
+        schema = MultipleValidatesSchema()
+        
+        errors = schema.validate(
+            {'first_name': 'anaa', 'last_name': 'uha',
+             'age': 16, 'party_type': 'alcool'
+        })
+        import pdb; pdb.set_trace()
+        assert 'first_name' in errors
+        assert 'last_name' in errors
+        assert errors['first_name'][0] == 'names should be at least 6 characters long.'
 
     def test_field_not_present(self):
         class BadSchema(ValidatesSchema):

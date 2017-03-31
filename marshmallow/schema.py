@@ -879,7 +879,7 @@ class BaseSchema(base.SchemaABC):
             if many:
                 for idx, item in enumerate(data):
                     try:
-                        values = {k: data[v.attribute or k] for k, v in field_objects.items()}
+                        values = {k: item[v.attribute or k] for k, v in field_objects.items()}
                     except KeyError:
                         pass
                     else:
